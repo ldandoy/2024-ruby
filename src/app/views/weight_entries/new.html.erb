@@ -1,0 +1,30 @@
+<h1 class="text-2xl font-bold text-center mb-6">Ajouter un nouveau suivi de poids</h1>
+
+<%= form_with(model: @weight_entry, local: true, class: "max-w-3xl mx-auto p-6 bg-white shadow-md rounded-md") do |form| %>
+    <% if @weight_entry.errors.any? %>
+        <div class="mb-6 p-4 bg-red-200 text-red-700 rounded">
+            <h2 class="text-xl font-semibold">Erreur(s) de validation</h2>
+            <ul class="list-disc pl-5">
+                <% @weight_entry.errors.full_messages.each do |message| %>
+                    <li><%= message %></li>
+                <% end %>
+            </ul>
+        </div>
+    <% end %>
+
+    <div class="mb-4">
+        <%= form.label :weight, class: "block font-medium text-gray-700" %>
+        <%= form.number_field :weight, class: "w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500", step: "0.1", placeholder: "Entrez votre poids" %>
+    </div>
+
+    <div class="mb-4">
+        <%= form.label :date, class: "block font-medium text-gray-700" %>
+        <%= form.date_field :date, class: "w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+    </div>
+
+    <div class="flex justify-end">
+        <%= form.submit "Enregistrer", class: "px-6 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+    </div>
+<% end %>
+
+<%= link_to 'Retour', weight_entries_path, class: "mt-6 block text-center text-blue-600 hover:text-blue-700" %>

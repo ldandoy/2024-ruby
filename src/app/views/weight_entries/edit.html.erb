@@ -1,0 +1,31 @@
+<h1 class="text-2xl font-bold text-center mb-6">Modifier l'entrée de poids</h1>
+
+<%= form_with model: @weight_entry, local: true, class: "max-w-3xl mx-auto p-6 bg-white shadow-md rounded-md" do |form| %>
+  <% if @weight_entry.errors.any? %>
+    <div class="mb-4 bg-red-100 text-red-700 p-4 rounded-md">
+      <h2 class="font-semibold">Erreurs :</h2>
+      <ul>
+        <% @weight_entry.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-4">
+    <%= form.label :weight, "Poids (kg)", class: "block text-lg font-medium text-gray-700" %>
+    <%= form.number_field :weight, class: "w-full px-4 py-2 mt-2 border rounded-md", step: "0.1", value: @weight_entry.weight, required: true %>
+  </div>
+
+  <div class="mb-4">
+    <%= form.label :date, "Date de la mesure", class: "block text-lg font-medium text-gray-700" %>
+    <%= form.date_field :date, class: "w-full px-4 py-2 mt-2 border rounded-md", value: @weight_entry.date.strftime("%Y-%m-%d"), required: true %>
+  </div>
+
+  <div class="flex justify-between items-center">
+    <%= form.submit "Mettre à jour", class: "px-4 py-2 w-full bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+  </div>
+<% end %>
+
+
+<%= link_to 'Retour', weight_entries_path, class: "mt-6 block text-center text-blue-600 hover:text-blue-700" %>
