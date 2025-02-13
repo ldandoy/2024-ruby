@@ -1,4 +1,5 @@
 class WeightEntriesController < ApplicationController
+  before_action :authenticate_user!
   before_action :set_weight_entry, only: [:show, :edit, :update, :destroy]
 
   def index

@@ -786,3 +786,446 @@ En suite, on va ajouter la partie javascript à notre application.
 import "chartkick" 
 import "Chart.bundle"
 ```
+
+Et pour finir pour ajoute le html qui va générer le chart dans notre page.
+*app/views/index.html.erb*
+```
+<%# app/views/weight_entries/index.html.erb %>
+<div class="container mx-auto p-6">
+  <h1 class="text-4xl font-bold text-center text-blue-600 mb-6">Trackeuse de Poids</h1>
+
+  <div class="mb-4">
+    
+  </div>
+
+  <div class="flex justify-end mb-4">
+    <%= link_to "Ajouter une nouvelle entrée", new_weight_entry_path, class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+  
+  <div class="overflow-x-auto">
+    <table class="min-w-full bg-white shadow-md rounded-lg">
+      <thead>
+        <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+          <th class="py-3 px-6 text-left">Date</th>
+          <th class="py-3 px-6 text-left">Poids (kg)</th>
+          <th class="py-3 px-6 text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="text-gray-600 text-sm font-light">
+        <% @weight_entries.each do |entry| %>
+          <tr class="border-b border-gray-200 hover:bg-gray-100">
+            <td class="py-3 px-6 text-left"><%= entry.date %></td>
+            <td class="py-3 px-6 text-left"><%= entry.weight %></td>
+            <td class="py-3 px-6 text-center flex justify-center">
+              <%= link_to "Voir", weight_entry_path(entry), class: "text-blue-500 hover:underline" %> |
+              <%= link_to "Modifier", edit_weight_entry_path(entry), class: "text-green-500 hover:underline" %> |
+              <%= button_to weight_entry_path(entry), method: :delete,
+            form: { data: { turbo_confirm: "Are you sure...?" } },
+        class: "text-red-500 hover:underline", title: "Delete" do
+      %>
+        Supprimer
+        <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+Et en vous rendant sur http://127.0.0.1:3000 vous devriez voir:
+
+![[Capture d'écran 2025-01-22 152145.png]]
+
+## Authentification
+
+### Installation du gem devise
+
+On ajoute directement devise dans le fichier Gemfile
+
+*src/Gemfile*
+```
+gem 'devise'
+```
+
+ou
+
+```bash
+$ docker-compose exec web bundle add devise
+```
+
+En suite il faut relancer le build pour ajouter le gem au projet
+
+```
+$ docker-compose down
+$ docker-compose up --build -d
+```
+
+Maintenant il faut installé et configurer devise  au niveau du projet
+
+```
+$ docker-compose exec web rails generate devise:install
+```
+
+Tous les fichiers nécessaire vont être créé ainsi que la configuration.
+
+### Mise en place de la base de données
+
+Comme pour toute authentification, il va falloir créer une table users, avec les informations nécessaire à l'authentification des utilisateurs.
+
+```
+$ docker-compose exec web rails generate devise User
+$ docker-compose exec web rails db:migrate
+$ docker-compose down
+$ docker-compose up -d
+```
+
+### Configuration des permissions
+
+Maintenant que nous avons la base de donnée qui est en place, il va falloir restreindre l'accès aux pages en fonction de l'utilisateur connecté.
+
+*app/controllers/weight_entries_controllers.rb*
+```
+class WeightEntriesController < ApplicationController
+	before_action :authenticate_user!
+	before_action :set_weight_entry, only: [:show, :edit, :update, :destroy]
+
+	def index
+		@weight_entries = WeightEntry.order(date: :desc)
+	end
+
+	def new
+	    @weight_entry = WeightEntry.new
+	end
+
+	def create
+		@weight_entry = WeightEntry.new(weight_entry_params)
+		if @weight_entry.save
+			redirect_to weight_entries_path, notice: "Entrée de poids ajoutée avec succès."
+		else
+			render :new
+		end
+	end
+
+	def show
+	end
+
+	def edit
+	end
+
+	def update
+	    if @weight_entry.update(weight_entry_params)
+		    redirect_to weight_entries_path, notice: "Entrée de poids mise à jour."
+	    else
+		    render :edit
+	    end
+	end
+
+	def destroy
+		@weight_entry.destroy
+		redirect_to weight_entries_path, notice: "Entrée supprimée."
+	end
+
+	private
+
+	def set_weight_entry
+		@weight_entry = WeightEntry.find(params[:id])
+	end
+
+	def weight_entry_params
+		params.require(:weight_entry).permit(:weight, :date)
+	end
+end
+```
+
+*app/controllers/application_controller.rb*
+```
+class ApplicationController < ActionController::Base
+	before_action :authenticate_user!
+	# Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
+
+	allow_browser versions: :modern
+	
+	def after_sign_in_path_for(resource)
+		weight_entries_path # Remplacez par la page souhaitée 
+	end
+end
+```
+
+### Personnalisation des vues
+
+Si les vues par default ne vous plaise pas, vous pouvez les modifier. Dans un premier temps, il faut générer les fichiers au niveau de votre application. Pour bien comprendre il y a un système de fallback, c'est à dire que Ruby On Rails va d'abord regarder dans les fichiers du dossier app/views s'il y a des templates, s'il n'y en a pas, il va regarder dans les fichiers du gems.
+
+Ici, on va utiliser la génération automatique des fichiers et ensuite, vous n'aurez plus qu'à afficher le choses !
+
+```
+$ docker-compose exec web rails generate devise:views
+$ sudo chown -R ${USER}:${USER} src
+```
+
+Et pour finir on ajout le bouton de déconnexion et de ceux de connextion, création de compte. Dans un premier temps on va créer un dossier shared pour stocker les templates que l'on peut inclure dans notre application.
+
+```
+$ mkdir app/views/shared
+```
+
+
+*app/views/shared/_nav.html.erb*
+```
+<nav class="bg-blue-600 text-white p-4"> 
+	<div class="container mx-auto flex justify-between items-center"> 
+		<div class="text-lg font-bold"> 
+			<%= link_to 'Mon Application', root_path, class: "hover:underline" %> 
+		</div>
+		
+		<div class="flex items-center justify-center">
+		<% if user_signed_in? %>
+			<span class="mr-4"><%= current_user.email %></span> 
+			<%= button_to destroy_user_session_path, method: :delete,
+                    form: { data: { turbo_confirm: "Etes vous sûr ? ?" } },
+                    class: "text-white hover:bg-red-700 bg-red-500 rounded-xl px-4 py-2", title: "Déconnexion" do
+                %>
+                    Déconnexion
+                <% end %>
+		<% else %> 
+			<%= link_to 'Connexion', new_user_session_path, class: "text-blue-300 hover:text-white mr-4" %> 
+			<%= link_to 'Inscription', new_user_registration_path, class: "text-blue-300 hover:text-white" %> 
+		<% end %>
+		</div>
+	</div>
+</nav>
+```
+
+En suite on l'ajout au layout de l'application
+
+*app/views/layouts/application.html.erb*
+```
+<!DOCTYPE html>
+<html>
+	<head>
+		<title><%= content_for(:title) || "App" %></title>
+		<meta name="viewport" content="width=device-width,initial-scale=1">
+		<meta name="mobile-web-app-capable" content="yes">
+		<%= csrf_meta_tags %>
+		<%= csp_meta_tag %>
+		
+		<%= yield :head %>
+    
+		<link rel="icon" href="/icon.png" type="image/png">
+		<link rel="icon" href="/icon.svg" type="image/svg+xml">
+		<link rel="apple-touch-icon" href="/icon.png">
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+		<%= javascript_importmap_tags %>
+	</head>
+
+	<body>
+		<%= render "shared/nav" %>
+		
+		<main class="container mx-auto mt-28 px-5">
+			<% if flash[:notice] %>
+				<div class="container mx-auto p-6">  
+					<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+						<strong class="font-bold">Succès!</strong>
+						<span class="block sm:inline"><%= flash[:notice] %></span>
+					</div>
+				</div>
+			<% end %>
+		
+			<%= yield %>
+		</main
+	</body>
+</html>
+```
+
+
+Et pour finir on va styliser un peu la page de register et de login.
+
+*app/views/devise/sessions/new*
+```
+<div class="border border-gray-200 rounded-2xl p-10 w-1/2 m-auto bg-blue-600/30 shadow-lg">
+  <h2 class="text-center text-3xl">Connexion</h2>
+
+  <%= form_for(resource, as: resource_name, url: session_path(resource_name)) do |f| %>
+    <div class="field mt-4">
+      <%= f.label :email %><br />
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", class: "w-full p-3 border border-gray-200 rounded-xl" %>
+    </div>
+
+    <div class="field mt-4">
+      <%= f.label :password %><br />
+      <%= f.password_field :password, autocomplete: "current-password", class: "w-full p-3 border border-gray-200 rounded-xl" %>
+    </div>
+
+    <% if devise_mapping.rememberable? %>
+      <div class="field mt-4">
+        <%= f.check_box :remember_me %>
+        <%= f.label :remember_me %>
+      </div>
+    <% end %>
+
+    <div class="actions mt-4">
+      <%= f.submit "Log in", class: 'text-white border border-blue-600 bg-blue-600 hover:bg-blue-700 hover:border-blue-700 rounded-xl px-4 py-2' %>
+    </div>
+  <% end %>
+  <%= render "devise/shared/links" %>
+</div>
+```
+
+*app/views/devise/shared/_links.html.erb*
+```
+<div class="mt-4 flex items-center justify-between w-2/3 m-auto">
+  <%- if controller_name != 'sessions' %>
+    <%= link_to "Déjà un compte ?", new_session_path(resource_name) %><br />
+  <% end %>
+
+  <%- if devise_mapping.registerable? && controller_name != 'registrations' %>
+    <%= link_to "Pas encore de compte ?", new_registration_path(resource_name) %><br />
+  <% end %>
+
+  <%- if devise_mapping.recoverable? && controller_name != 'passwords' && controller_name != 'registrations' %>
+    <%= link_to "Mot de passe oublié ?", new_password_path(resource_name) %><br />
+  <% end %>
+
+  <%- if devise_mapping.confirmable? && controller_name != 'confirmations' %>
+    <%= link_to "Didn't receive confirmation instructions?", new_confirmation_path(resource_name) %><br />
+  <% end %>
+
+  <%- if devise_mapping.lockable? && resource_class.unlock_strategy_enabled?(:email) && controller_name != 'unlocks' %>
+    <%= link_to "Didn't receive unlock instructions?", new_unlock_path(resource_name) %><br />
+  <% end %>
+
+  <%- if devise_mapping.omniauthable? %>
+    <%- resource_class.omniauth_providers.each do |provider| %>
+      <%= button_to "Sign in with #{OmniAuth::Utils.camelize(provider)}", omniauth_authorize_path(resource_name, provider), data: { turbo: false } %><br />
+    <% end %>
+  <% end %>
+</div>
+```
+
+*app/views/devise/registrations/new*
+```ruby
+<div class="border border-gray-200 rounded-2xl p-10 w-1/2 m-auto bg-blue-600/30 shadow-lg">
+
+  <h2 class="text-center text-3xl">Créez votre compte</h2>
+
+  
+
+  <%= form_for(resource, as: resource_name, url: registration_path(resource_name)) do |f| %>
+
+    <%= render "devise/shared/error_messages", resource: resource %>
+
+  
+
+    <div class="field mt-4">
+
+      <%= f.label :email %><br />
+
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", class: "w-full p-3 border border-gray-200 rounded-xl" %>
+
+    </div>
+
+  
+
+    <div class="field mt-4">
+
+      <%= f.label :password %>
+
+      <% if @minimum_password_length %>
+
+        <em>(<%= @minimum_password_length %> characters minimum)</em>
+
+      <% end %><br />
+
+      <%= f.password_field :password, autocomplete: "new-password", class: "w-full p-3 border border-gray-200 rounded-xl" %>
+
+    </div>
+
+  
+
+    <div class="field mt-4">
+
+      <%= f.label :password_confirmation %><br />
+
+      <%= f.password_field :password_confirmation, autocomplete: "new-password", class: "w-full p-3 border border-gray-200 rounded-xl" %>
+
+    </div>
+
+  
+
+    <div class="actions mt-4">
+
+      <%= f.submit "Créez le compte", class: 'text-white border border-blue-600 bg-blue-600 hover:bg-blue-700 hover:border-blue-700 rounded-xl px-4 py-2' %>
+
+    </div>
+
+  <% end %>
+
+  
+
+  <%= render "devise/shared/links" %>
+
+</div>
+```
+
+*app/views/devise/passwords/new.html.erv*
+```ruby
+<div class="border border-gray-200 rounded-2xl p-10 w-1/2 m-auto bg-blue-600/30 shadow-lg">
+
+  <h2 class="text-center text-3xl">Mot de passe oublié ?</h2>
+
+  <%= form_for(resource, as: resource_name, url: password_path(resource_name), html: { method: :post }) do |f| %>
+    <%= render "devise/shared/error_messages", resource: resource %>
+
+    <div class="field mt-4">
+      <%= f.label :email %><br />
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", class: "w-full p-3 border border-gray-200 rounded-xl" %>
+    </div>
+
+
+    <div class="actions mt-4">
+      <%= f.submit "Envoyer le lien par mail", class: 'text-white border border-blue-600 bg-blue-600 hover:bg-blue-700 hover:border-blue-700 rounded-xl px-4 py-2' %>
+    </div>
+  <% end %>
+
+  <%= render "devise/shared/links" %>
+</div>
+```
+## Liaison entre les utilisateurs et les entrées de poids
+
+### Modification des models pour les liés
+
+Il va falloir dire de chaque côté de l'association comment sont liés les deux models
+
+*app/models/weight_entry.rb*
+```ruby
+class WeightEntry < ApplicationRecord
+	belongs_to :user
+	
+	validates :weight, presence: true, numericality: { greater_than: 0 }
+	validates :date, presence: true
+end
+```
+
+A présent le model User
+
+*app/models/user.rb*
+```ruby
+class User < ApplicationRecord
+	# Associations from Devise 
+	devise :database_authenticatable, :registerable, :recoverable, :rememberable, :validatable # Relationship with weight entries has_many :weight_entries, dependent: :destroy
+
+	has_many :weight_entries, dependent: :destroy
+end
+```
+
+Maintenant que les models sont modifiés, il va falloir générer le fichier de migration pour mettre à jour la base de données.
+
+```bash
+$ docker-compose exec web rails generate migration AddUserToWeightEntries user:references
+$ docker-compose exec web rails db:migrate
+```
+
+Pour finir on va modifier la fonction set_weight_entry du controller, afin que l'on récupère uniquement les entrées de l'utilisateurs. Ainsi que toutes les requêtes de récupération des données.
+
